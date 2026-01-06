@@ -1,42 +1,36 @@
-# 🔬 NaNote - Aplikasi Catatan & Kalkulator PSA Nanomaterial
+# NaNote - Aplikasi Catatan Praktikum & Kalkulator PSA
 
-![NaNote](https://img.shields.io/badge/NaNote-v1.0-blue)
-![Streamlit](https://img.shields.io/badge/Streamlit-1.28.0-red)
-![Python](https://img.shields.io/badge/Python-3.8%2B-green)
-![License](https://img.shields.io/badge/License-MIT-yellow)
+Aplikasi web berbasis Streamlit untuk mencatat hasil praktikum dan mengkalkulasi hasil PSA (Particle Size Analysis) nanomaterial.
 
-**NaNote** adalah aplikasi web berbasis Streamlit untuk mencatat hasil praktik dan mengkalkulasi hasil PSA (Particle Size Analysis) nanomaterial dalam bahasa Indonesia.
+## 🌟 Fitur Utama
 
-## ✨ Fitur Utama
+### 📝 Catatan Praktikum
+- Input data praktikum lengkap (tujuan, alat, prosedur, hasil, analisis, kesimpulan)
+- Template otomatis untuk berbagai jenis praktikum
+- Simpan catatan dalam format Microsoft Word (.docx)
+- Penyimpanan data lokal di browser
 
-### 📝 **Sistem Pencatatan Praktik**
-- Form input lengkap untuk eksperimen nanomaterial
-- Penyimpanan data terstruktur
-- **Ekspor ke format Word (.docx)**
+### 🧮 Kalkulator PSA
+- Input data PDI, %vol, dan diameter untuk multiple sampel
+- Perhitungan diameter rata-rata berbobot volume
+- Analisis PDI rata-rata dan kualitas nanomaterial
+- Visualisasi distribusi ukuran partikel
+- Ekspor hasil dalam format PDF profesional
 
-### 🧮 **Kalkulator PSA**
-- Input data distribusi ukuran (Diameter, % Volume, PDI)
-- Analisis statistik lengkap
-- Visualisasi interaktif dengan Plotly
-- Klasifikasi kualitas otomatis berdasarkan PDI
-- **Ekspor ke format PDF**
+### 📊 Manajemen Data
+- Penyimpanan data catatan dan hasil perhitungan
+- Ekspor data backup dalam format JSON
+- Pencarian dan filter data tersimpan
+- Integrasi antara catatan dan hasil PSA
 
-### 📊 **Manajemen Data**
-- Penyimpanan data dalam session
-- Filter dan pencarian data
-- Organisasi catatan dan hasil
-- Interface user-friendly dalam bahasa Indonesia
-
-## 🚀 Instalasi & Deployment
-
-### **1. Instalasi Lokal**
+### Jalankan Lokal
 ```bash
 # Clone repository
-git clone https://github.com/username/nanote-app.git
-cd nanote-app
+git clone https://github.com/username/nanote.git
+cd nanote
 
 # Install dependencies
 pip install -r requirements.txt
 
-# Jalankan aplikasi
+# Run aplikasi
 streamlit run app.py
