@@ -435,20 +435,20 @@ elif menu == "📝 Catatan Praktikum":
             
             col1, col2 = st.columns(2)
             with col1:
-                tujuan = st.text_area("Tujuan Praktikum*", height=150, 
+                tujuan = st.text_area("Tujuan Praktikum*", height=1500, 
                                     placeholder="Tuliskan tujuan praktikum...")
-                alat_bahan = st.text_area("Alat dan Bahan*", height=150,
+                alat_bahan = st.text_area("Alat dan Bahan*", height=1500,
                                         placeholder="Daftar alat dan bahan...")
             
             with col2:
-                prosedur = st.text_area("Prosedur Kerja*", height=150,
+                prosedur = st.text_area("Prosedur Kerja*", height=1500,
                                       placeholder="Langkah-langkah percobaan...")
-                hasil = st.text_area("Hasil Pengamatan*", height=150,
+                hasil = st.text_area("Hasil Pengamatan*", height=1500,
                                    placeholder="Hasil yang diamati...")
             
-            analisis = st.text_area("Analisis Data", height=120,
+            analisis = st.text_area("Analisis Data", height=1200,
                                   placeholder="Analisis dari hasil yang diperoleh...")
-            kesimpulan = st.text_area("Kesimpulan", height=100,
+            kesimpulan = st.text_area("Kesimpulan", height=1000,
                                     placeholder="Kesimpulan praktikum...")
             
             submitted = st.form_submit_button("💾 Simpan Catatan", use_container_width=True)
