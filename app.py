@@ -9,7 +9,6 @@ from reportlab.pdfgen import canvas
 from reportlab.lib import colors
 from reportlab.platypus import Table, TableStyle
 import matplotlib.pyplot as plt
-import json
 
 # Konfigurasi halaman
 st.set_page_config(
