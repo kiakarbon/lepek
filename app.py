@@ -351,7 +351,6 @@ if menu == "🏠 Beranda":
             <ul>
                 <li>Catatan → Word (.docx)</li>
                 <li>Hasil PSA → PDF</li>
-                <li>Data mentah → CSV</li>
             </ul>
         </div>
         """, unsafe_allow_html=True)
@@ -773,14 +772,13 @@ elif menu == "📊 Data Tersimpan":
                     'export_time': datetime.now().isoformat()
                 }
                 
-                json_str = json.dumps(all_data, indent=2, ensure_ascii=False)
-                
                 st.download_button(
-                    label="⬇️ Download JSON",
-                    data=json_str,
-                    file_name=f"nanote_backup_{datetime.now().strftime('%Y%m%d')}.json",
-                    mime="application/json",
-                    key="json_download"
+                    label="📄 Download Word Backup",
+                    data=doc_buffer,
+                    file_name=f"nanote_backup_{datetime.now().strftime('%Y%m%d')}.docx",
+                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    use_container_width=True,
+                    key="word_backup_download"
                 )
     
     with tab2:
