@@ -619,7 +619,7 @@ elif menu == "🧮 Kalkulasi PSA":
             
             if hasil:
                 st.session_state.current_psa = {
-                    'kalkulasi': kalkulasi,
+                    'hasil': kalkulasi,
                     'data_input': data_input,
                     'pdi_list': pdi_list,
                     'vol_list': vol_list,
@@ -629,7 +629,7 @@ elif menu == "🧮 Kalkulasi PSA":
                 # Simpan ke history
                 st.session_state.psa_data.append({
                     'waktu': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                    'hasil': hasil,
+                    'hasil': kalkulasi,
                     'data_count': len(data_input)
                 })
                 
