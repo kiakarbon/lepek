@@ -386,7 +386,7 @@ if menu == "🏠 Beranda":
     
     # Contoh data untuk demonstrasi
     contoh_data = pd.DataFrame({
-        'No': [1, 2, 3, 4, 5],
+        'Ulangan': [1, 2, 3, 4, 5],
         'PDI': [0.12, 0.15, 0.18, 0.09, 0.11],
         '%Vol': [20, 25, 30, 15, 10],
         'Diameter (nm)': [45, 52, 48, 55, 60]
