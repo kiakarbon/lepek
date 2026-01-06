@@ -18,7 +18,7 @@ import os
 
 # Konfigurasi halaman
 st.set_page_config(
-    page_title="NaNote - Catatan Praktikum & Kalkulator PSA",
+    page_title="NaNote - Catatan Praktikum & Kalkulasi PSA",
     page_icon="🔬",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -40,21 +40,21 @@ st.markdown("""
         margin-bottom: 2rem;
     }
     .section-header {
-        color: #1E40AF;
+        color: #1D546D;
         border-left: 5px solid #3B82F6;
         padding-left: 15px;
         margin-top: 2rem;
         margin-bottom: 1rem;
     }
     .data-box {
-        background-color: #F3F4F6;
+        background-color: #FF986A;
         padding: 20px;
         border-radius: 10px;
         margin-bottom: 20px;
         border: 1px solid #E5E7EB;
     }
     .result-box {
-        background-color: #D1FAE5;
+        background-color: #C47BE4;
         padding: 15px;
         border-radius: 8px;
         margin: 10px 0;
@@ -107,9 +107,9 @@ if 'current_psa' not in st.session_state:
     st.session_state.current_psa = {}
 
 # Fungsi untuk menghitung hasil PSA
-def hitung_hasil_psa(pdi, vol, diameter):
+def kalkulasi_hasil_psa(pdi, vol, diameter):
     """
-    Menghitung hasil PSA berdasarkan parameter input
+    Kalkulasi hasil PSA berdasarkan parameter input
     """
     try:
         # Konversi ke array numpy untuk perhitungan
@@ -306,7 +306,7 @@ with st.sidebar:
     
     menu = st.radio(
         "Pilih Menu:",
-        ["🏠 Beranda", "📝 Catatan Praktikum", "🧮 Kalkulator PSA", "📊 Data Tersimpan", "ℹ️ Panduan"]
+        ["🏠 Beranda", "📝 Catatan Praktikum", "🧮 Kalkulasi PSA", "📊 Data Tersimpan", "ℹ️ Panduan"]
     )
     
     st.markdown("---")
@@ -341,7 +341,7 @@ if menu == "🏠 Beranda":
     with col2:
         st.markdown("""
         <div class="data-box">
-            <h3>🧮 Kalkulator PSA</h3>
+            <h3>🧮 Kalkulasi PSA</h3>
             <p>Hitung hasil Particle Size Analysis dari data PDI, %vol, dan diameter.</p>
             <ul>
                 <li>Input data multiple</li>
@@ -382,7 +382,7 @@ if menu == "🏠 Beranda":
     
     with col2:
         st.markdown("""
-        **Untuk Kalkulator PSA:**
+        **Untuk Kalkulasi PSA:**
         - Input data PDI, %vol, diameter
         - Perhitungan rata-rata berbobot
         - Analisis distribusi ukuran
@@ -424,16 +424,12 @@ elif menu == "📝 Catatan Praktikum":
             with col1:
                 judul = st.text_input("Judul Catatan*", placeholder="Contoh: Praktikum Sintesis Nanopartikel Fe3O4")
                 praktikan = st.text_input("Nama Praktikan*", placeholder="Nama lengkap Anda")
-                mata_praktikum = st.selectbox(
-                    "Mata Praktikum*",
-                    ["Pilih...", "Nanomaterial dan Aplikasinya", "Sintesis Material", 
-                     "Karakterisasi Material", "Praktikum Kimia Material", "Lainnya"]
-                )
+                mata_praktikum = st.text_input("Mata Praktikum*", placeholder="Contoh: Nanomaterial 2")
             
             with col2:
                 tanggal = st.date_input("Tanggal Praktikum*", datetime.now())
                 kelompok = st.text_input("Kelompok", placeholder="Contoh: Kelompok 5")
-                asisten = st.text_input("Asisten Lab", placeholder="Nama asisten laboratorium")
+                pic = st.text_input("PIC Praktikum", placeholder="Nama PIC Praktikum")
             
             st.markdown("### Isi Catatan")
             
@@ -541,10 +537,10 @@ elif menu == "📝 Catatan Praktikum":
                             key=f"download_{idx}"
                         )
 
-elif menu == "🧮 Kalkulator PSA":
-    st.markdown('<h2 class="section-header">🧮 Kalkulator Particle Size Analysis</h2>', unsafe_allow_html=True)
+elif menu == "🧮 Kalkulasi PSA":
+    st.markdown('<h2 class="section-header">🧮 Kalkulasi Particle Size Analysis</h2>', unsafe_allow_html=True)
     
-    tab1, tab2 = st.tabs(["Input Data", "Hasil Perhitungan"])
+    tab1, tab2 = st.tabs(["Input Data", "Hasil Kalkulasi"])
     
     with tab1:
         st.markdown("""
@@ -582,7 +578,7 @@ elif menu == "🧮 Kalkulator PSA":
         for i in range(jumlah_data):
             cols = st.columns(4)
             with cols[0]:
-                no = st.text_input(f"No", value=str(i+1), disabled=True, key=f"no_{i}")
+                ulangan = st.text_input(f"Ulangan", value=str(i+1), disabled=True, key=f"ulangan_{i}")
             with cols[1]:
                 pdi = st.number_input(
                     f"PDI",
@@ -612,14 +608,14 @@ elif menu == "🧮 Kalkulator PSA":
             data_input.append([pdi, vol, diameter])
         
         # Tombol hitung
-        if st.button("🚀 Hitung Hasil PSA", type="primary", use_container_width=True):
+        if st.button("🚀 Kalkulasi Hasil PSA", type="primary", use_container_width=True):
             # Ekstrak data
             pdi_list = [d[0] for d in data_input]
             vol_list = [d[1] for d in data_input]
             diameter_list = [d[2] for d in data_input]
             
-            # Hitung hasil
-            hasil = hitung_hasil_psa(pdi_list, vol_list, diameter_list)
+            # Kalkulasi hasil
+            kalkulasi = kalkulasi_hasil_psa(pdi_list, vol_list, diameter_list)
             
             if hasil:
                 st.session_state.current_psa = {
@@ -647,7 +643,7 @@ elif menu == "🧮 Kalkulator PSA":
             hasil = st.session_state.current_psa['hasil']
             data_input = st.session_state.current_psa['data_input']
             
-            st.markdown("### 📊 Hasil Perhitungan")
+            st.markdown("### 📊 Hasil Kalkulasi")
             
             # Tampilkan hasil utama
             col1, col2, col3 = st.columns(3)
@@ -866,6 +862,6 @@ else:  # Panduan
 # Footer
 st.markdown("---")
 st.markdown('<div class="footer">', unsafe_allow_html=True)
-st.markdown("🔬 **NaNote v1.0** • Aplikasi Catatan Praktikum & Kalkulator PSA • Dikembangkan untuk Pendidikan Nanomaterial")
+st.markdown("🔬 **NaNote v1.0** • Aplikasi Catatan Praktikum & Kalkulasi PSA • Dibuat oleh Kelompok 3 Logika dan Pemrograman Komputer")
 st.markdown(f"© {datetime.now().year} • Dibuat dengan Streamlit")
 st.markdown('</div>', unsafe_allow_html=True)
