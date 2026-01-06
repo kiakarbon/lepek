@@ -465,7 +465,7 @@ elif menu == "📝 Catatan Praktikum":
                         'mata_praktikum': mata_praktikum,
                         'tanggal': tanggal.strftime("%Y-%m-%d"),
                         'kelompok': kelompok,
-                        'asisten': asisten,
+                        'pic': pic,
                         'isi': {
                             'tujuan': tujuan,
                             'alat_bahan': alat_bahan,
@@ -619,7 +619,7 @@ elif menu == "🧮 Kalkulasi PSA":
             
             if hasil:
                 st.session_state.current_psa = {
-                    'hasil': hasil,
+                    'kalkulasi': kalkulasi,
                     'data_input': data_input,
                     'pdi_list': pdi_list,
                     'vol_list': vol_list,
@@ -809,7 +809,7 @@ else:  # Panduan
     2. **Menganalisis data PSA** (Particle Size Analysis)
     3. **Menyimpan dan mengekspor** hasil dalam format standar
     
-    ### 🎯 Cara Menggunakan
+    ### 🔎 Cara Menggunakan
     
     #### 1. Catatan Praktikum
     - Buka menu **"📝 Catatan Praktikum"**
@@ -863,5 +863,5 @@ else:  # Panduan
 st.markdown("---")
 st.markdown('<div class="footer">', unsafe_allow_html=True)
 st.markdown("🔬 **NaNote v1.0** • Aplikasi Catatan Praktikum & Kalkulasi PSA • Dibuat oleh Kelompok 3 Logika dan Pemrograman Komputer")
-st.markdown(f"© {datetime.now().year} • Dibuat dengan Streamlit")
+st.markdown(f"© {datetime.now().year}")
 st.markdown('</div>', unsafe_allow_html=True)
