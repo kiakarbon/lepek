@@ -289,7 +289,7 @@ def buat_grafik_distribusi(distribusi):
 
 # Sidebar
 with st.sidebar:
-    st.image("https://cdn-icons-png.flaticon.com/512/1995/1995463.png", width=80)
+    st.image("https://www.flaticon.com/free-icon/github_733609", width=80)
     st.title("NaNote")
     st.markdown("**Catatan & Kalkulator PSA**")
     
