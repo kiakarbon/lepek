@@ -41,7 +41,7 @@ st.markdown("""
         margin-bottom: 1rem;
     }
     .data-box {
-        background-color: #FF986A;
+        background-color: #C0C9EE;
         padding: 20px;
         border-radius: 10px;
         margin-bottom: 20px;
