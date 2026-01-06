@@ -3,18 +3,13 @@ import pandas as pd
 import numpy as np
 from datetime import datetime
 import io
-import base64
-import tempfile
 from docx import Document
-from docx.shared import Inches, Pt
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 from reportlab.lib import colors
 from reportlab.platypus import Table, TableStyle
 import matplotlib.pyplot as plt
-from matplotlib.backends.backend_pdf import PdfPages
 import json
-import os
 
 # Konfigurasi halaman
 st.set_page_config(
@@ -74,11 +69,6 @@ st.markdown("""
         padding: 10px 24px;
         font-weight: bold;
         border: none;
-        transition: all 0.3s;
-    }
-    .stButton button:hover {
-        background-color: #2563EB;
-        transform: translateY(-2px);
     }
     .stDownloadButton button {
         background-color: #10B981;
@@ -363,54 +353,6 @@ if menu == "🏠 Beranda":
             </ul>
         </div>
         """, unsafe_allow_html=True)
-    
-    st.markdown("---")
-    
-    st.markdown("### 🎯 Fitur Utama")
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.markdown("""
-        **Untuk Catatan Praktikum:**
-        - Input data praktikum lengkap
-        - Kategorisasi otomatis
-        - Template siap pakai
-        - Ekspor ke Microsoft Word
-        - Penyimpanan lokal
-        """)
-    
-    with col2:
-        st.markdown("""
-        **Untuk Kalkulasi PSA:**
-        - Input data PDI, %vol, diameter
-        - Perhitungan rata-rata berbobot
-        - Analisis distribusi ukuran
-        - Penilaian kualitas nanomaterial
-        - Ekspor ke PDF profesional
-        """)
-    
-    st.markdown("---")
-    
-    st.markdown("### 📈 Contoh Hasil PSA")
-    
-    # Contoh data untuk demonstrasi
-    contoh_data = pd.DataFrame({
-        'No': [1, 2, 3, 4, 5],
-        'PDI': [0.12, 0.15, 0.18, 0.09, 0.11],
-        '%Vol': [20, 25, 30, 15, 10],
-        'Diameter (nm)': [45, 52, 48, 55, 60]
-    })
-    
-    st.dataframe(contoh_data, use_container_width=True)
-    
-    st.markdown("""
-    **Interpretasi Hasil:**
-    - **PDI < 0.1**: Sangat Baik (Monodispers)
-    - **PDI 0.1-0.2**: Baik
-    - **PDI 0.2-0.3**: Cukup
-    - **PDI > 0.3**: Kurang (Polydispers Tinggi)
-    """)
 
 elif menu == "📝 Catatan Praktikum":
     st.markdown('<h2 class="section-header">📝 Buat Catatan Praktikum</h2>', unsafe_allow_html=True)
@@ -435,27 +377,20 @@ elif menu == "📝 Catatan Praktikum":
             
             col1, col2 = st.columns(2)
             with col1:
-                tujuan = st.text_area("Tujuan Praktikum*", height=150, 
-                                    placeholder="Tuliskan tujuan praktikum...")
-                alat_bahan = st.text_area("Alat dan Bahan*", height=150,
-                                        placeholder="Daftar alat dan bahan...")
+                tujuan = st.text_area("Tujuan Praktikum*", height=150, placeholder="Tuliskan tujuan praktikum...")
+                alat_bahan = st.text_area("Alat dan Bahan*", height=150, placeholder="Daftar alat dan bahan...")
             
             with col2:
-                prosedur = st.text_area("Prosedur Kerja*", height=150,
-                                      placeholder="Langkah-langkah percobaan...")
-                hasil = st.text_area("Hasil Pengamatan*", height=150,
-                                   placeholder="Hasil yang diamati...")
+                prosedur = st.text_area("Prosedur Kerja*", height=150, placeholder="Langkah-langkah percobaan...")
+                hasil = st.text_area("Hasil Pengamatan*", height=150, placeholder="Hasil yang diamati...")
             
-            analisis = st.text_area("Analisis Data", height=120,
-                                  placeholder="Analisis dari hasil yang diperoleh...")
-            kesimpulan = st.text_area("Kesimpulan", height=100,
-                                    placeholder="Kesimpulan praktikum...")
+            analisis = st.text_area("Analisis Data", height=120, placeholder="Analisis dari hasil yang diperoleh...")
+            kesimpulan = st.text_area("Kesimpulan", height=100, placeholder="Kesimpulan praktikum...")
             
             submitted = st.form_submit_button("💾 Simpan Catatan", use_container_width=True)
             
             if submitted:
-                if not all([judul, praktikan, mata_praktikum, tujuan, 
-                          alat_bahan, prosedur, hasil]):
+                if not all([judul, praktikan, mata_praktikum, tujuan, alat_bahan, prosedur, hasil]):
                     st.error("Harap isi semua field yang wajib diisi (*)")
                 else:
                     catatan_data = {
@@ -492,7 +427,7 @@ elif menu == "📝 Catatan Praktikum":
                         st.markdown(f"**Prosedur:**\n{prosedur}")
                         st.markdown(f"**Hasil:**\n{hasil}")
                     
-                    # Tombol download
+                    # Tombol download - PERBAIKAN DI SINI
                     doc = buat_file_word(catatan_data)
                     doc_buffer = io.BytesIO()
                     doc.save(doc_buffer)
@@ -529,12 +464,13 @@ elif menu == "📝 Catatan Praktikum":
                         doc.save(doc_buffer)
                         doc_buffer.seek(0)
                         
+                        # PERBAIKAN: Gunakan key yang unik
                         st.download_button(
                             label="📥 Download",
                             data=doc_buffer,
                             file_name=f"catatan_{catatan['judul'].replace(' ', '_')}_{catatan['tanggal']}.docx",
                             mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                            key=f"download_catatan_{idx}_{catatan['id']}"
+                            key=f"download_{idx}_{catatan['id']}"
                         )
 
 elif menu == "🧮 Kalkulasi PSA":
@@ -633,12 +569,12 @@ elif menu == "🧮 Kalkulasi PSA":
                     'data_count': len(data_input)
                 })
                 
-                st.success("✅ Perhitungan selesai! Buka tab 'Hasil Perhitungan'.")
+                st.success("✅ Perhitungan selesai! Buka tab 'Hasil Kalkulasi'.")
                 st.rerun()
     
     with tab2:
         if 'current_psa' not in st.session_state or not st.session_state.current_psa:
-            st.info("ℹ️ Masukkan data di tab 'Input Data' dan klik 'Hitung Hasil PSA'.")
+            st.info("ℹ️ Masukkan data di tab 'Input Data' dan klik 'Kalkulasi Hasil PSA'.")
         else:
             hasil = st.session_state.current_psa['hasil']
             data_input = st.session_state.current_psa['data_input']
@@ -696,7 +632,7 @@ elif menu == "🧮 Kalkulasi PSA":
             })
             st.dataframe(df_distribusi, use_container_width=True)
             
-            # Tombol download PDF
+            # Tombol download PDF - PERBAIKAN DI SINI
             pdf_buffer = buat_file_pdf(hasil, df_input.values.tolist())
             
             st.download_button(
@@ -704,29 +640,9 @@ elif menu == "🧮 Kalkulasi PSA":
                 data=pdf_buffer,
                 file_name=f"hasil_PSA_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
                 mime="application/pdf",
-                use_container_width=True
+                use_container_width=True,
+                key="download_pdf_hasil"
             )
-            
-            # Tambahkan ke catatan jika ada
-            if st.session_state.catatan_list:
-                st.markdown("---")
-                st.markdown("### 💾 Simpan ke Catatan")
-                
-                catatan_options = {cat['judul']: idx for idx, cat in enumerate(st.session_state.catatan_list)}
-                selected_note = st.selectbox(
-                    "Pilih Catatan untuk Menyimpan Hasil PSA:",
-                    ["Pilih..."] + list(catatan_options.keys())
-                )
-                
-                if selected_note != "Pilih..." and st.button("💾 Simpan ke Catatan"):
-                    idx = catatan_options[selected_note]
-                    st.session_state.catatan_list[idx]['data_psa'] = {
-                        'diameter_rata': hasil['diameter_rata'],
-                        'pdi_rata': hasil['pdi_rata'],
-                        'kualitas': hasil['kualitas'],
-                        'total_vol': hasil['total_vol']
-                    }
-                    st.success(f"✅ Hasil PSA berhasil disimpan ke catatan '{selected_note}'!")
 
 elif menu == "📊 Data Tersimpan":
     st.markdown('<h2 class="section-header">📊 Data Tersimpan</h2>', unsafe_allow_html=True)
@@ -739,7 +655,7 @@ elif menu == "📊 Data Tersimpan":
         else:
             st.markdown(f"### Total Catatan: {len(st.session_state.catatan_list)}")
             
-            for catatan in st.session_state.catatan_list:
+            for idx, catatan in enumerate(st.session_state.catatan_list):
                 with st.expander(f"{catatan['judul']} ({catatan['tanggal']})"):
                     col1, col2 = st.columns([3, 1])
                     
@@ -761,11 +677,13 @@ elif menu == "📊 Data Tersimpan":
                         doc.save(doc_buffer)
                         doc_buffer.seek(0)
                         
+                        # PERBAIKAN: Tambahkan key yang unik
                         st.download_button(
                             label="📥 Word",
                             data=doc_buffer,
-                            file_name=f"Catatan_{catatan['judul'].replace(' ', '_')}.docx",
-                            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                            file_name=f"catatan_{catatan['judul'].replace(' ', '_')}.docx",
+                            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                            key=f"word_download_{idx}"
                         )
             
             # Tombol ekspor semua
@@ -777,87 +695,15 @@ elif menu == "📊 Data Tersimpan":
                 }
                 
                 json_str = json.dumps(all_data, indent=2, ensure_ascii=False)
+                
+                # PERBAIKAN: Tambahkan key yang unik
                 st.download_button(
                     label="⬇️ Download JSON",
                     data=json_str,
                     file_name=f"nanote_backup_{datetime.now().strftime('%Y%m%d')}.json",
-                    mime="application/json"
+                    mime="application/json",
+                    key="json_download"
                 )
-    
-    with tab2:
-        if not st.session_state.psa_data:
-            st.info("🧮 Belum ada hasil PSA yang disimpan.")
-        else:
-            st.markdown(f"### Total Hasil PSA: {len(st.session_state.psa_data)}")
-            
-            for idx, psa in enumerate(st.session_state.psa_data):
-                with st.expander(f"Perhitungan {idx+1} - {psa['waktu']}"):
-                    st.markdown(f"**Waktu:** {psa['waktu']}")
-                    st.markdown(f"**Jumlah Data:** {psa['data_count']}")
-                    st.markdown(f"**Diameter Rata-rata:** {psa['hasil']['diameter_rata']:.2f} nm")
-                    st.markdown(f"**PDI Rata-rata:** {psa['hasil']['pdi_rata']:.3f}")
-                    st.markdown(f"**Kualitas:** {psa['hasil']['kualitas']}")
-
-else:  # Panduan
-    st.markdown('<h2 class="section-header">ℹ️ Panduan Penggunaan</h2>', unsafe_allow_html=True)
-    
-    st.markdown("""
-    ### 📚 Tentang NaNote
-    
-    NaNote adalah aplikasi web yang dirancang khusus untuk membantu praktikan dalam:
-    1. **Mencatat hasil praktikum** nanomaterial secara digital
-    2. **Menganalisis data PSA** (Particle Size Analysis)
-    3. **Menyimpan dan mengekspor** hasil dalam format standar
-    
-    ### 🔎 Cara Menggunakan
-    
-    #### 1. Catatan Praktikum
-    - Buka menu **"📝 Catatan Praktikum"**
-    - Isi form dengan data lengkap praktikum
-    - Simpan catatan dan download sebagai file Word (.docx)
-    
-    #### 2. Kalkulator PSA
-    - Buka menu **"🧮 Kalkulator PSA"**
-    - Input data PDI, %vol, dan diameter untuk setiap partikel
-    - Klik "Hitung Hasil PSA"
-    - Lihat hasil di tab "Hasil Perhitungan"
-    - Download hasil sebagai PDF
-    
-    #### 3. Data Tersimpan
-    - Buka menu **"📊 Data Tersimpan"**
-    - Lihat semua catatan dan hasil perhitungan yang telah disimpan
-    - Ekspor data backup jika diperlukan
-    
-    ### 📊 Interpretasi Hasil PSA
-    
-    **Polydispersity Index (PDI):**
-    - **< 0.1**: Sangat Baik (Monodispers)
-    - **0.1 - 0.2**: Baik
-    - **0.2 - 0.3**: Cukup
-    - **> 0.3**: Kurang (Polydispers Tinggi)
-    
-    **Diameter:**
-    - < 10 nm: Ultra kecil
-    - 10-50 nm: Kecil
-    - 50-100 nm: Sedang
-    - 100-500 nm: Besar
-    - > 500 nm: Sangat besar
-    
-    ### 💡 Tips
-    1. Simpan catatan segera setelah praktikum selesai
-    2. Periksa konsistensi data sebelum menghitung PSA
-    3. Gunakan ekspor PDF untuk laporan formal
-    4. Backup data penting secara berkala
-    
-    ### 🛠️ Teknologi
-    - **Framework**: Streamlit (Python)
-    - **Format Ekspor**: .docx, .pdf
-    - **Deployment**: Streamlit Cloud
-    - **Bahasa**: Indonesia
-    
-    ### 🤝 Kontribusi
-    Aplikasi ini bersifat open source. Untuk saran dan masukan, silakan buat issue di repository GitHub.
-    """)
 
 # Footer
 st.markdown("---")
