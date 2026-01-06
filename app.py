@@ -615,11 +615,11 @@ elif menu == "🧮 Kalkulasi PSA":
             diameter_list = [d[2] for d in data_input]
             
             # Kalkulasi hasil
-            kalkulasi = kalkulasi_hasil_psa(pdi_list, vol_list, diameter_list)
+            hasil = kalkulasi_hasil_psa(pdi_list, vol_list, diameter_list)
             
             if hasil:
                 st.session_state.current_psa = {
-                    'hasil': kalkulasi,
+                    'hasil': hasil,
                     'data_input': data_input,
                     'pdi_list': pdi_list,
                     'vol_list': vol_list,
@@ -629,7 +629,7 @@ elif menu == "🧮 Kalkulasi PSA":
                 # Simpan ke history
                 st.session_state.psa_data.append({
                     'waktu': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                    'hasil': kalkulasi,
+                    'hasil': hasil,
                     'data_count': len(data_input)
                 })
                 
