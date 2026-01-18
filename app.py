@@ -9,7 +9,426 @@ from reportlab.pdfgen import canvas
 from reportlab.lib import colors
 from reportlab.platypus import Table, TableStyle
 import matplotlib.pyplot as plt
+import streamlit as st
+import pandas as pd
+import numpy as np
+from datetime import datetime
+import io
+import json
+import hashlib
+from pathlib import Path
 
+# ============================================
+# KONFIGURASI AWAL
+# ============================================
+
+# Konfigurasi halaman
+st.set_page_config(
+    page_title="NaNote - Catatan Praktikum & Kalkulasi PSA",
+    page_icon="🔬",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# CSS sederhana inline
+st.markdown("""
+<style>
+    .main-title {
+        text-align: center;
+        color: #1E3A8A;
+        font-size: 2.5rem;
+        margin-bottom: 1rem;
+    }
+    .login-box {
+        max-width: 400px;
+        margin: 100px auto;
+        padding: 30px;
+        border-radius: 10px;
+        border: 1px solid #E5E7EB;
+        background-color: white;
+        text-align: center;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    .stButton button {
+        width: 100%;
+        background-color: #3B82F6;
+        color: white;
+        border-radius: 5px;
+        padding: 10px;
+        font-weight: bold;
+        border: none;
+        margin-top: 20px;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# ============================================
+# FUNGSI LOGIN SEDERHANA
+# ============================================
+
+# Data pengguna (simpan di session state)
+if 'users' not in st.session_state:
+    st.session_state.users = {
+        'demo': {'password': 'demo123', 'name': 'Demo User'},
+        'admin': {'password': 'admin123', 'name': 'Administrator'},
+        'user': {'password': 'user123', 'name': 'Regular User'}
+    }
+
+def hash_password(password):
+    """Hash password sederhana"""
+    return hashlib.sha256(password.encode()).hexdigest()[:10]
+
+def check_login(username, password):
+    """Cek login"""
+    if username in st.session_state.users:
+        if st.session_state.users[username]['password'] == password:
+            return True
+    return False
+
+def add_user(username, password, name=""):
+    """Tambah pengguna baru"""
+    st.session_state.users[username] = {
+        'password': password,
+        'name': name if name else username
+    }
+    return True
+
+# ============================================
+# HALAMAN LOGIN SEDERHANA
+# ============================================
+
+def show_login_page():
+    """Tampilkan halaman login"""
+    
+    # Header
+    st.markdown('<h1 class="main-title">🔬 NaNote</h1>', unsafe_allow_html=True)
+    st.markdown('<p style="text-align: center; color: #4B5563;">Aplikasi Catatan Praktikum & Kalkulator PSA</p>', unsafe_allow_html=True)
+    
+    # Container login
+    col1, col2, col3 = st.columns([1, 2, 1])
+    
+    with col2:
+        st.markdown('<div class="login-box">', unsafe_allow_html=True)
+        
+        st.markdown('<h3 style="color: #1E3A8A;">Login</h3>', unsafe_allow_html=True)
+        
+        # Tab pilihan
+        tab1, tab2 = st.tabs(["Masuk", "Buat Akun"])
+        
+        with tab1:
+            username = st.text_input("Username", placeholder="Masukkan username")
+            password = st.text_input("Password", type="password", placeholder="Masukkan password")
+            
+            # Tombol login
+            if st.button("Login"):
+                if not username or not password:
+                    st.error("Username dan password harus diisi")
+                elif check_login(username, password):
+                    st.session_state.logged_in = True
+                    st.session_state.username = username
+                    st.session_state.user_info = st.session_state.users[username]
+                    st.success(f"Selamat datang, {username}!")
+                    st.rerun()
+                else:
+                    st.error("Username atau password salah")
+            
+            # Info akun demo
+            st.markdown("---")
+            st.markdown("**Akun untuk mencoba:**")
+            st.code("Username: demo\nPassword: demo123")
+            st.markdown("")
+            st.code("Username: admin\nPassword: admin123")
+        
+        with tab2:
+            new_user = st.text_input("Username Baru", placeholder="Pilih username")
+            new_pass = st.text_input("Password Baru", type="password", placeholder="Pilih password")
+            confirm_pass = st.text_input("Konfirmasi Password", type="password", placeholder="Ulangi password")
+            full_name = st.text_input("Nama Lengkap (opsional)", placeholder="Nama Anda")
+            
+            if st.button("Daftar"):
+                if not new_user or not new_pass:
+                    st.error("Username dan password harus diisi")
+                elif len(new_user) < 3:
+                    st.error("Username minimal 3 karakter")
+                elif len(new_pass) < 4:
+                    st.error("Password minimal 4 karakter")
+                elif new_pass != confirm_pass:
+                    st.error("Password tidak cocok")
+                elif new_user in st.session_state.users:
+                    st.error("Username sudah digunakan")
+                else:
+                    add_user(new_user, new_pass, full_name)
+                    st.success(f"Akun {new_user} berhasil dibuat! Silakan login.")
+        
+        st.markdown('</div>', unsafe_allow_html=True)
+    
+    # Footer
+    st.markdown("---")
+    st.markdown('<p style="text-align: center; color: #6B7280;">🔬 NaNote - Catatan Praktikum & Kalkulasi PSA</p>', unsafe_allow_html=True)
+
+# ============================================
+# APLIKASI UTAMA (Sederhana)
+# ============================================
+
+def main_app():
+    """Aplikasi utama setelah login"""
+    
+    # Sidebar
+    with st.sidebar:
+        st.title("🔬 NaNote")
+        st.markdown(f"**User:** {st.session_state.username}")
+        
+        if 'user_info' in st.session_state and 'name' in st.session_state.user_info:
+            st.markdown(f"*{st.session_state.user_info['name']}*")
+        
+        st.markdown("---")
+        
+        # Menu
+        menu = st.radio(
+            "Menu:",
+            ["🏠 Beranda", "📝 Catatan", "🧮 Kalkulasi", "📊 Data", "ℹ️ Info", "🚪 Logout"]
+        )
+    
+    # Konten utama
+    if menu == "🏠 Beranda":
+        st.markdown("# 🔬 Selamat Datang di NaNote")
+        st.markdown("Aplikasi untuk mencatat praktikum dan menghitung PSA")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.info("**Fitur Utama:**")
+            st.markdown("- 📝 Catatan praktikum")
+            st.markdown("- 🧮 Kalkulasi PSA")
+            st.markdown("- 📊 Analisis data")
+            st.markdown("- 💾 Simpan data lokal")
+        
+        with col2:
+            st.info("**Instruksi:**")
+            st.markdown("1. Pilih menu di sidebar")
+            st.markdown("2. Buat catatan atau hitung PSA")
+            st.markdown("3. Simpan hasil kerja Anda")
+            st.markdown("4. Logout setelah selesai")
+    
+    elif menu == "📝 Catatan":
+        st.markdown("# 📝 Buat Catatan Praktikum")
+        
+        with st.form("catatan_form"):
+            judul = st.text_input("Judul Catatan")
+            tanggal = st.date_input("Tanggal")
+            isi = st.text_area("Isi Catatan", height=200)
+            
+            if st.form_submit_button("Simpan"):
+                if judul and isi:
+                    # Simpan di session state
+                    if 'catatan' not in st.session_state:
+                        st.session_state.catatan = []
+                    
+                    catatan_baru = {
+                        'id': len(st.session_state.catatan) + 1,
+                        'judul': judul,
+                        'tanggal': str(tanggal),
+                        'isi': isi,
+                        'user': st.session_state.username,
+                        'waktu': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    }
+                    
+                    st.session_state.catatan.append(catatan_baru)
+                    st.success(f"Catatan '{judul}' berhasil disimpan!")
+                else:
+                    st.error("Judul dan isi catatan harus diisi")
+        
+        # Daftar catatan
+        if 'catatan' in st.session_state and st.session_state.catatan:
+            st.markdown("### 📚 Catatan Tersimpan")
+            for cat in st.session_state.catatan:
+                if cat['user'] == st.session_state.username:
+                    with st.expander(f"{cat['judul']} - {cat['tanggal']}"):
+                        st.markdown(f"**Dibuat oleh:** {cat['user']}")
+                        st.markdown(f"**Waktu:** {cat['waktu']}")
+                        st.markdown(cat['isi'])
+    
+    elif menu == "🧮 Kalkulasi":
+        st.markdown("# 🧮 Kalkulasi PSA")
+        
+        st.info("Masukkan data untuk kalkulasi PSA (Particle Size Analysis)")
+        
+        # Input data
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            pdi = st.number_input("PDI", min_value=0.0, max_value=1.0, value=0.15, step=0.01)
+        
+        with col2:
+            vol = st.number_input("% Volume", min_value=0.0, max_value=100.0, value=20.0, step=1.0)
+        
+        with col3:
+            diameter = st.number_input("Diameter (nm)", min_value=0.1, value=50.0, step=1.0)
+        
+        # Tombol hitung
+        if st.button("Hitung Hasil"):
+            try:
+                # Perhitungan sederhana
+                if vol == 0:
+                    st.error("Volume tidak boleh 0")
+                else:
+                    # Simulasi perhitungan
+                    hasil = {
+                        'diameter_rata': diameter,
+                        'pdi_rata': pdi,
+                        'kualitas': "Baik" if pdi < 0.2 else "Cukup" if pdi < 0.3 else "Kurang",
+                        'warna': "green" if pdi < 0.2 else "orange" if pdi < 0.3 else "red"
+                    }
+                    
+                    # Tampilkan hasil
+                    st.markdown("### 📊 Hasil Kalkulasi")
+                    
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        st.metric("Diameter Rata-rata", f"{hasil['diameter_rata']:.2f} nm")
+                    with col2:
+                        st.metric("PDI Rata-rata", f"{hasil['pdi_rata']:.3f}")
+                    with col3:
+                        warna = hasil['warna']
+                        st.markdown(f"<h3 style='color:{warna};'>Kualitas: {hasil['kualitas']}</h3>", unsafe_allow_html=True)
+                    
+                    # Simpan hasil
+                    if 'psa_data' not in st.session_state:
+                        st.session_state.psa_data = []
+                    
+                    hasil_data = {
+                        'id': len(st.session_state.psa_data) + 1,
+                        'user': st.session_state.username,
+                        'pdi': pdi,
+                        'vol': vol,
+                        'diameter': diameter,
+                        'hasil': hasil,
+                        'waktu': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    }
+                    
+                    st.session_state.psa_data.append(hasil_data)
+                    st.success("Hasil berhasil disimpan!")
+            
+            except Exception as e:
+                st.error(f"Error dalam perhitungan: {str(e)}")
+    
+    elif menu == "📊 Data":
+        st.markdown("# 📊 Data Tersimpan")
+        
+        # Data catatan
+        if 'catatan' in st.session_state and st.session_state.catatan:
+            st.markdown("### Catatan Praktikum")
+            catatan_user = [c for c in st.session_state.catatan if c['user'] == st.session_state.username]
+            
+            if catatan_user:
+                for cat in catatan_user:
+                    st.markdown(f"**{cat['judul']}** ({cat['tanggal']})")
+                    st.caption(f"Dibuat: {cat['waktu']}")
+            else:
+                st.info("Belum ada catatan")
+        else:
+            st.info("Belum ada catatan")
+        
+        # Data PSA
+        if 'psa_data' in st.session_state and st.session_state.psa_data:
+            st.markdown("### Hasil PSA")
+            psa_user = [p for p in st.session_state.psa_data if p['user'] == st.session_state.username]
+            
+            if psa_user:
+                for psa in psa_user:
+                    with st.expander(f"PSA #{psa['id']} - {psa['waktu']}"):
+                        st.markdown(f"PDI: {psa['pdi']}")
+                        st.markdown(f"%Vol: {psa['vol']}")
+                        st.markdown(f"Diameter: {psa['diameter']} nm")
+                        st.markdown(f"Kualitas: {psa['hasil']['kualitas']}")
+            else:
+                st.info("Belum ada data PSA")
+        else:
+            st.info("Belum ada data PSA")
+    
+    elif menu == "ℹ️ Info":
+        st.markdown("# ℹ️ Informasi Aplikasi")
+        
+        st.markdown("""
+        ## Tentang NaNote
+        
+        NaNote adalah aplikasi sederhana untuk:
+        - Mencatat hasil praktikum nanomaterial
+        - Melakukan kalkulasi PSA (Particle Size Analysis)
+        - Menyimpan data secara lokal
+        
+        ## Cara Menggunakan
+        
+        1. **Buat Catatan**: Menu "📝 Catatan"
+           - Isi judul, tanggal, dan isi catatan
+           - Klik "Simpan" untuk menyimpan
+        
+        2. **Kalkulasi PSA**: Menu "🧮 Kalkulasi"
+           - Masukkan data PDI, %Volume, dan Diameter
+           - Klik "Hitung Hasil" untuk melihat hasil
+        
+        3. **Lihat Data**: Menu "📊 Data"
+           - Lihat semua catatan dan hasil kalkulasi
+        
+        ## Interpretasi PDI
+        
+        - **PDI < 0.2**: Baik
+        - **PDI 0.2-0.3**: Cukup
+        - **PDI > 0.3**: Kurang
+        
+        ## Keamanan
+        
+        - Data disimpan di session state browser
+        - Data akan hilang jika browser ditutup
+        - Untuk penyimpanan permanen, ekspor data secara manual
+        
+        ## Pengembang
+        
+        Aplikasi ini dikembangkan untuk keperluan praktikum nanomaterial.
+        """)
+    
+    elif menu == "🚪 Logout":
+        st.markdown("# 🚪 Logout")
+        
+        st.warning("Apakah Anda yakin ingin logout?")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            if st.button("Ya, Logout"):
+                st.session_state.logged_in = False
+                if 'username' in st.session_state:
+                    del st.session_state.username
+                st.success("Logout berhasil!")
+                st.rerun()
+        
+        with col2:
+            if st.button("Tidak, Kembali"):
+                st.rerun()
+    
+    # Footer
+    st.markdown("---")
+    st.markdown(f'<p style="text-align: center; color: #6B7280;">🔬 NaNote • User: {st.session_state.username} • {datetime.now().year}</p>', unsafe_allow_html=True)
+
+# ============================================
+# MAIN APP
+# ============================================
+
+def main():
+    """Fungsi utama aplikasi"""
+    
+    # Inisialisasi status login
+    if 'logged_in' not in st.session_state:
+        st.session_state.logged_in = False
+    
+    # Tampilkan halaman sesuai status
+    if not st.session_state.logged_in:
+        show_login_page()
+    else:
+        main_app()
+
+if __name__ == "__main__":
+    main()
 # Konfigurasi halaman
 st.set_page_config(
     page_title="NaNote - Catatan Praktikum & Kalkulasi PSA",
