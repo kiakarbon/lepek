@@ -110,26 +110,6 @@ DB_FILE = "users_db.json"
 
 def init_database():
     """Inisialisasi database JSON"""
-    if not os.path.exists(DB_FILE):
-        # Buat file database dengan user default
-        default_users = {
-            "demo": {
-                "password": hashlib.sha256("demo123".encode()).hexdigest(),
-                "name": "Demo User",
-                "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            },
-            "admin": {
-                "password": hashlib.sha256("admin123".encode()).hexdigest(),
-                "name": "Administrator",
-                "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            }
-        }
-        with open(DB_FILE, 'w') as f:
-            json.dump(default_users, f, indent=2)
-        return default_users
-    else:
-        with open(DB_FILE, 'r') as f:
-            return json.load(f)
 
 def save_database(db):
     """Simpan database ke file"""
@@ -440,7 +420,7 @@ def show_login_page():
     st.markdown("---")
     st.markdown('<div class="footer">', unsafe_allow_html=True)
     st.markdown("🔬 **NaNote** • Aplikasi Catatan Praktikum & Kalkulasi PSA")
-    st.markdown(f"© {datetime.now().year} • Versi 2.0 dengan Sistem Login")
+    st.markdown(f"© {datetime.now().year} • Kelompok 3 Logika dan Pemrograman Komputer")
     st.markdown('</div>', unsafe_allow_html=True)
 
 # ============================================
