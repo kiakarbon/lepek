@@ -383,12 +383,6 @@ def show_login_page():
                         st.rerun()
                     else:
                         st.error(result)
-            
-            st.markdown("---")
-            st.markdown("**Akun demo untuk mencoba:**")
-            st.code("Username: demo\nPassword: demo123")
-            st.markdown("")
-            st.code("Username: admin\nPassword: admin123")
         
         with tab2:
             st.markdown("### Buat Akun Baru")
