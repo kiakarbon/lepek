@@ -69,15 +69,6 @@ st.markdown("""
         margin: 10px 0;
         border-left: 5px solid #F59E0B;
     }
-    .login-container {
-        max-width: 400px;
-        margin: 100px auto;
-        padding: 30px;
-        border-radius: 15px;
-        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
-        background-color: white;
-        text-align: center;
-    }
     .stButton button {
         background-color: #3B82F6;
         color: white;
