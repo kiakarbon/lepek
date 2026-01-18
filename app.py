@@ -300,15 +300,6 @@ with st.sidebar:
         ["🏠 Beranda", "📝 Catatan Praktikum", "🧮 Kalkulasi PSA", "📊 Data Tersimpan", "ℹ️ Panduan"]
     )
     
-    st.markdown("---")
-    
-    st.markdown("### Informasi")
-    st.info("""
-    Versi: 1.0.0
-    Untuk: Praktikum Nanomaterial
-    Bahasa: Indonesia
-    """)
-
 # Konten utama berdasarkan menu
 if menu == "🏠 Beranda":
     st.markdown('<h1 class="main-title">🔬 NaNote</h1>', unsafe_allow_html=True)
