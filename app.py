@@ -3,78 +3,15 @@ import pandas as pd
 import numpy as np
 from datetime import datetime
 import io
+import json
+import sqlite3
+from pathlib import Path
 from docx import Document
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 from reportlab.lib import colors
 from reportlab.platypus import Table, TableStyle
 import matplotlib.pyplot as plt
-import sqlite3
-import json
-
-def init_db():
-    conn = sqlite3.connect('nanote.db')
-    c = conn.cursor()
-    # Tabel catatan
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS catatan (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            judul TEXT,
-            praktikan TEXT,
-            mata_praktikum TEXT,
-            tanggal TEXT,
-            kelompok TEXT,
-            pic TEXT,
-            isi TEXT,  -- JSON string
-            waktu_buat TEXT
-        )
-    ''')
-    # Tabel PSA
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS psa (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            waktu TEXT,
-            data_input TEXT,  -- JSON string
-            hasil TEXT,  -- JSON string
-            data_count INTEGER
-        )
-    ''')
-    conn.commit()
-    conn.close()
-
-def simpan_catatan_db(catatan_data):
-    conn = sqlite3.connect('nanote.db')
-    c = conn.cursor()
-    isi_json = json.dumps(catatan_data['isi'])
-    c.execute('''
-        INSERT INTO catatan (judul, praktikan, mata_praktikum, tanggal, kelompok, pic, isi, waktu_buat)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    ''', (catatan_data['judul'], catatan_data['praktikan'], catatan_data['mata_praktikum'],
-          catatan_data['tanggal'], catatan_data['kelompok'], catatan_data['pic'],
-          isi_json, catatan_data['waktu_buat']))
-    conn.commit()
-    conn.close()
-
-def ambil_catatan_db():
-    conn = sqlite3.connect('nanote.db')
-    c = conn.cursor()
-    c.execute('SELECT * FROM catatan')
-    rows = c.fetchall()
-    catatan_list = []
-    for row in rows:
-        catatan_list.append({
-            'id': row[0],
-            'judul': row[1],
-            'praktikan': row[2],
-            'mata_praktikum': row[3],
-            'tanggal': row[4],
-            'kelompok': row[5],
-            'pic': row[6],
-            'isi': json.loads(row[7]),
-            'waktu_buat': row[8]
-        })
-    conn.close()
-    return catatan_list
 
 # Konfigurasi halaman
 st.set_page_config(
@@ -148,20 +85,335 @@ st.markdown("""
         color: #6B7280;
         font-size: 0.9rem;
     }
+    .stats-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 10px;
+        padding: 20px;
+        color: white;
+        margin: 10px 0;
+    }
 </style>
 """, unsafe_allow_html=True)
 
-# Inisialisasi session state
-if 'catatan_list' not in st.session_state:
-    st.session_state.catatan_list = []
-if 'psa_data' not in st.session_state:
-    st.session_state.psa_data = []
-if 'current_note' not in st.session_state:
-    st.session_state.current_note = {}
-if 'current_psa' not in st.session_state:
-    st.session_state.current_psa = {}
-if 'show_download' not in st.session_state:
-    st.session_state.show_download = False
+# ============================================
+# FUNGSI DATABASE
+# ============================================
+
+def init_database():
+    """Inisialisasi database SQLite"""
+    conn = sqlite3.connect('nanote.db', check_same_thread=False)
+    c = conn.cursor()
+    
+    # Tabel untuk riwayat pengguna
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS user_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT,
+            activity_type TEXT,
+            activity_data TEXT,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    
+    # Tabel untuk catatan praktikum
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS catatan_praktikum (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT,
+            judul TEXT,
+            praktikan TEXT,
+            mata_praktikum TEXT,
+            tanggal TEXT,
+            kelompok TEXT,
+            pic TEXT,
+            tujuan TEXT,
+            alat_bahan TEXT,
+            prosedur TEXT,
+            hasil TEXT,
+            analisis TEXT,
+            kesimpulan TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    
+    # Tabel untuk hasil PSA
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS hasil_psa (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT,
+            data_input TEXT,
+            diameter_rata REAL,
+            pdi_rata REAL,
+            total_vol REAL,
+            kualitas TEXT,
+            distribusi TEXT,
+            jumlah_partikel INTEGER,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    
+    # Tabel untuk statistik penggunaan
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS usage_stats (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT,
+            page_views INTEGER DEFAULT 0,
+            catatan_created INTEGER DEFAULT 0,
+            psa_calculated INTEGER DEFAULT 0,
+            last_active DATETIME,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    
+    conn.commit()
+    return conn
+
+def get_user_id():
+    """Mendapatkan ID unik pengguna dari session state"""
+    if 'user_id' not in st.session_state:
+        # Generate user ID berdasarkan waktu dan random number
+        import random
+        import time
+        st.session_state.user_id = f"user_{int(time.time())}_{random.randint(1000, 9999)}"
+    return st.session_state.user_id
+
+def log_activity(conn, activity_type, activity_data):
+    """Mencatat aktivitas pengguna ke database"""
+    user_id = get_user_id()
+    c = conn.cursor()
+    
+    # Log aktivitas
+    c.execute('''
+        INSERT INTO user_history (user_id, activity_type, activity_data)
+        VALUES (?, ?, ?)
+    ''', (user_id, activity_type, json.dumps(activity_data)))
+    
+    # Update statistik penggunaan
+    c.execute('''
+        INSERT OR IGNORE INTO usage_stats (user_id, page_views, catatan_created, psa_calculated, last_active)
+        VALUES (?, 0, 0, 0, CURRENT_TIMESTAMP)
+    ''', (user_id,))
+    
+    # Update last_active
+    c.execute('''
+        UPDATE usage_stats 
+        SET last_active = CURRENT_TIMESTAMP 
+        WHERE user_id = ?
+    ''', (user_id,))
+    
+    # Update statistik berdasarkan jenis aktivitas
+    if activity_type == 'catatan_created':
+        c.execute('''
+            UPDATE usage_stats 
+            SET catatan_created = catatan_created + 1 
+            WHERE user_id = ?
+        ''', (user_id,))
+    elif activity_type == 'psa_calculated':
+        c.execute('''
+            UPDATE usage_stats 
+            SET psa_calculated = psa_calculated + 1 
+            WHERE user_id = ?
+        ''', (user_id,))
+    
+    conn.commit()
+
+def save_catatan_to_db(conn, catatan_data):
+    """Menyimpan catatan ke database"""
+    user_id = get_user_id()
+    c = conn.cursor()
+    
+    c.execute('''
+        INSERT INTO catatan_praktikum 
+        (user_id, judul, praktikan, mata_praktikum, tanggal, kelompok, pic, 
+         tujuan, alat_bahan, prosedur, hasil, analisis, kesimpulan)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ''', (
+        user_id,
+        catatan_data['judul'],
+        catatan_data['praktikan'],
+        catatan_data['mata_praktikum'],
+        catatan_data['tanggal'],
+        catatan_data.get('kelompok', ''),
+        catatan_data.get('pic', ''),
+        catatan_data['isi']['tujuan'],
+        catatan_data['isi']['alat_bahan'],
+        catatan_data['isi']['prosedur'],
+        catatan_data['isi']['hasil'],
+        catatan_data['isi'].get('analisis', ''),
+        catatan_data['isi'].get('kesimpulan', '')
+    ))
+    
+    catatan_id = c.lastrowid
+    conn.commit()
+    
+    # Log aktivitas
+    log_activity(conn, 'catatan_created', {
+        'catatan_id': catatan_id,
+        'judul': catatan_data['judul'],
+        'timestamp': datetime.now().isoformat()
+    })
+    
+    return catatan_id
+
+def save_psa_to_db(conn, psa_data, data_input):
+    """Menyimpan hasil PSA ke database"""
+    user_id = get_user_id()
+    c = conn.cursor()
+    
+    c.execute('''
+        INSERT INTO hasil_psa 
+        (user_id, data_input, diameter_rata, pdi_rata, total_vol, 
+         kualitas, distribusi, jumlah_partikel)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    ''', (
+        user_id,
+        json.dumps(data_input),
+        psa_data['diameter_rata'],
+        psa_data['pdi_rata'],
+        psa_data['total_vol'],
+        psa_data['kualitas'],
+        json.dumps(psa_data['distribusi']),
+        psa_data['jumlah_partikel']
+    ))
+    
+    psa_id = c.lastrowid
+    conn.commit()
+    
+    # Log aktivitas
+    log_activity(conn, 'psa_calculated', {
+        'psa_id': psa_id,
+        'diameter_rata': psa_data['diameter_rata'],
+        'pdi_rata': psa_data['pdi_rata'],
+        'timestamp': datetime.now().isoformat()
+    })
+    
+    return psa_id
+
+def get_user_catatan(conn):
+    """Mendapatkan catatan pengguna dari database"""
+    user_id = get_user_id()
+    c = conn.cursor()
+    
+    c.execute('''
+        SELECT * FROM catatan_praktikum 
+        WHERE user_id = ? 
+        ORDER BY created_at DESC
+    ''', (user_id,))
+    
+    rows = c.fetchall()
+    catatan_list = []
+    
+    for row in rows:
+        catatan_list.append({
+            'id': row[0],
+            'judul': row[2],
+            'praktikan': row[3],
+            'mata_praktikum': row[4],
+            'tanggal': row[5],
+            'kelompok': row[6],
+            'pic': row[7],
+            'isi': {
+                'tujuan': row[8],
+                'alat_bahan': row[9],
+                'prosedur': row[10],
+                'hasil': row[11],
+                'analisis': row[12],
+                'kesimpulan': row[13]
+            },
+            'waktu_buat': row[14]
+        })
+    
+    return catatan_list
+
+def get_user_psa_history(conn):
+    """Mendapatkan riwayat PSA pengguna dari database"""
+    user_id = get_user_id()
+    c = conn.cursor()
+    
+    c.execute('''
+        SELECT * FROM hasil_psa 
+        WHERE user_id = ? 
+        ORDER BY created_at DESC
+    ''', (user_id,))
+    
+    rows = c.fetchall()
+    psa_list = []
+    
+    for row in rows:
+        psa_list.append({
+            'id': row[0],
+            'data_input': json.loads(row[2]),
+            'diameter_rata': row[3],
+            'pdi_rata': row[4],
+            'total_vol': row[5],
+            'kualitas': row[6],
+            'distribusi': json.loads(row[7]),
+            'jumlah_partikel': row[8],
+            'created_at': row[9]
+        })
+    
+    return psa_list
+
+def get_user_stats(conn):
+    """Mendapatkan statistik penggunaan pengguna"""
+    user_id = get_user_id()
+    c = conn.cursor()
+    
+    c.execute('''
+        SELECT * FROM usage_stats WHERE user_id = ?
+    ''', (user_id,))
+    
+    row = c.fetchone()
+    
+    if row:
+        return {
+            'page_views': row[2],
+            'catatan_created': row[3],
+            'psa_calculated': row[4],
+            'last_active': row[5],
+            'created_at': row[6]
+        }
+    else:
+        return {
+            'page_views': 0,
+            'catatan_created': 0,
+            'psa_calculated': 0,
+            'last_active': None,
+            'created_at': None
+        }
+
+def get_recent_activities(conn, limit=10):
+    """Mendapatkan aktivitas terkini pengguna"""
+    user_id = get_user_id()
+    c = conn.cursor()
+    
+    c.execute('''
+        SELECT activity_type, activity_data, timestamp 
+        FROM user_history 
+        WHERE user_id = ? 
+        ORDER BY timestamp DESC 
+        LIMIT ?
+    ''', (user_id, limit))
+    
+    rows = c.fetchall()
+    activities = []
+    
+    for row in rows:
+        activity_data = json.loads(row[1]) if row[1] else {}
+        activities.append({
+            'type': row[0],
+            'data': activity_data,
+            'timestamp': row[2]
+        })
+    
+    return activities
+
+# Inisialisasi database
+conn = init_database()
+
+# ============================================
+# FUNGSI-FUNGSI UTAMA (TETAP SAMA)
+# ============================================
 
 # Fungsi untuk menghitung hasil PSA
 def kalkulasi_hasil_psa(pdi, vol, diameter):
@@ -353,20 +605,62 @@ def buat_grafik_distribusi(distribusi):
     plt.tight_layout()
     return fig
 
+# ============================================
+# INISIALISASI SESSION STATE
+# ============================================
+
+if 'catatan_list' not in st.session_state:
+    st.session_state.catatan_list = []
+if 'psa_data' not in st.session_state:
+    st.session_state.psa_data = []
+if 'current_note' not in st.session_state:
+    st.session_state.current_note = {}
+if 'current_psa' not in st.session_state:
+    st.session_state.current_psa = {}
+if 'show_download' not in st.session_state:
+    st.session_state.show_download = False
+if 'user_stats' not in st.session_state:
+    st.session_state.user_stats = {}
+if 'recent_activities' not in st.session_state:
+    st.session_state.recent_activities = []
+
 # Sidebar
 with st.sidebar:
     st.image("https://i.pinimg.com/1200x/8b/06/a8/8b06a832394c6d214729546d6888d0d0.jpg", width=80)
     st.title("NaNote")
     st.markdown("**Catatan & Kalkulator PSA**")
     
+    # Tampilkan statistik pengguna
+    user_stats = get_user_stats(conn)
+    st.markdown("---")
+    st.markdown("### 📊 Statistik Anda")
+    col1, col2 = st.columns(2)
+    with col1:
+        st.metric("Catatan", user_stats['catatan_created'])
+    with col2:
+        st.metric("PSA", user_stats['psa_calculated'])
+    
     st.markdown("---")
     
     menu = st.radio(
         "Pilih Menu:",
-        ["🏠 Beranda", "📝 Catatan Praktikum", "🧮 Kalkulasi PSA", "📊 Data Tersimpan", "ℹ️ Panduan"]
+        ["🏠 Beranda", "📝 Catatan Praktikum", "🧮 Kalkulasi PSA", "📊 Data Tersimpan", "📈 Riwayat & Statistik", "ℹ️ Panduan"]
     )
-    
-# Konten utama berdasarkan menu
+
+# ============================================
+# LOG PAGE VIEW
+# ============================================
+
+# Log aktivitas setiap kali halaman dibuka
+log_activity(conn, 'page_view', {
+    'page': menu,
+    'timestamp': datetime.now().isoformat()
+})
+
+# ============================================
+# KONTEN UTAMA BERDASARKAN MENU
+# ============================================
+
 if menu == "🏠 Beranda":
     st.markdown('<h1 class="main-title">🔬 NaNote</h1>', unsafe_allow_html=True)
     st.markdown('<p class="sub-title">Aplikasi Catatan Praktikum & Kalkulator PSA untuk Nanomaterial</p>', unsafe_allow_html=True)
@@ -382,6 +676,7 @@ if menu == "🏠 Beranda":
                 <li>Editor teks lengkap</li>
                 <li>Template otomatis</li>
                 <li>Simpan sebagai .docx</li>
+                <li>Database terintegrasi</li>
             </ul>
         </div>
         """, unsafe_allow_html=True)
@@ -395,6 +690,7 @@ if menu == "🏠 Beranda":
                 <li>Input data multiple</li>
                 <li>Perhitungan otomatis</li>
                 <li>Analisis kualitas</li>
+                <li>Riwayat tersimpan</li>
             </ul>
         </div>
         """, unsafe_allow_html=True)
@@ -407,7 +703,49 @@ if menu == "🏠 Beranda":
             <ul>
                 <li>Catatan → Word (.docx)</li>
                 <li>Hasil PSA → PDF</li>
+                <li>Database backup</li>
             </ul>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    st.markdown("---")
+    
+    # Tampilkan statistik pengguna di beranda
+    st.markdown("### 📈 Statistik Penggunaan Anda")
+    user_stats = get_user_stats(conn)
+    
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        st.markdown(f"""
+        <div class="stats-card">
+            <h4>📝 Catatan</h4>
+            <h2>{user_stats['catatan_created']}</h2>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col2:
+        st.markdown(f"""
+        <div class="stats-card">
+            <h4>🧮 PSA</h4>
+            <h2>{user_stats['psa_calculated']}</h2>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col3:
+        st.markdown(f"""
+        <div class="stats-card">
+            <h4>📊 Halaman</h4>
+            <h2>{user_stats['page_views']}</h2>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col4:
+        last_active = user_stats['last_active'] or "Belum aktif"
+        st.markdown(f"""
+        <div class="stats-card">
+            <h4>🕒 Terakhir</h4>
+            <h6>{str(last_active)[:19]}</h6>
         </div>
         """, unsafe_allow_html=True)
     
@@ -424,7 +762,8 @@ if menu == "🏠 Beranda":
         - Kategorisasi otomatis
         - Template siap pakai
         - Ekspor ke Microsoft Word
-        - Penyimpanan lokal
+        - Database SQLite terintegrasi
+        - Riwayat tersimpan permanen
         """)
     
     with col2:
@@ -435,6 +774,7 @@ if menu == "🏠 Beranda":
         - Analisis distribusi ukuran
         - Penilaian kualitas nanomaterial
         - Ekspor ke PDF profesional
+        - Riwayat perhitungan tersimpan
         """)
     
     st.markdown("---")
@@ -506,7 +846,6 @@ elif menu == "📝 Catatan Praktikum":
                     st.error("Harap isi semua field yang wajib diisi (*)")
                 else:
                     catatan_data = {
-                        'id': len(st.session_state.catatan_list) + 1,
                         'judul': judul,
                         'praktikan': praktikan,
                         'mata_praktikum': mata_praktikum,
@@ -520,15 +859,22 @@ elif menu == "📝 Catatan Praktikum":
                             'hasil': hasil,
                             'analisis': analisis,
                             'kesimpulan': kesimpulan
-                        },
-                        'waktu_buat': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                        }
                     }
                     
-                    st.session_state.catatan_list.append(catatan_data)
-                    st.session_state.current_note = catatan_data
-                    st.session_state.show_download = True
-                    
-                    st.success("✅ Catatan berhasil disimpan!")
+                    # Simpan ke database
+                    try:
+                        catatan_id = save_catatan_to_db(conn, catatan_data)
+                        st.success(f"✅ Catatan berhasil disimpan ke database! ID: {catatan_id}")
+                        
+                        # Update session state
+                        catatan_data['id'] = catatan_id
+                        catatan_data['waktu_buat'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                        st.session_state.current_note = catatan_data
+                        st.session_state.show_download = True
+                        
+                    except Exception as e:
+                        st.error(f"❌ Gagal menyimpan ke database: {str(e)}")
                     
                     # Tampilkan preview
                     with st.expander("Preview Catatan", expanded=True):
@@ -540,7 +886,7 @@ elif menu == "📝 Catatan Praktikum":
                         st.markdown(f"**Prosedur:**\n{prosedur}")
                         st.markdown(f"**Hasil:**\n{hasil}")
         
-        # TOMBOL DOWNLOAD DIPINDAHKAN DI SINI (DI LUAR FORM)
+        # Tombol download
         if st.session_state.show_download and st.session_state.current_note:
             catatan_data = st.session_state.current_note
             doc = buat_file_word(catatan_data)
@@ -557,18 +903,22 @@ elif menu == "📝 Catatan Praktikum":
             )
     
     with tab2:
-        if not st.session_state.catatan_list:
+        # Ambil data dari database
+        catatan_list = get_user_catatan(conn)
+        
+        if not catatan_list:
             st.info("📝 Belum ada catatan yang disimpan.")
         else:
-            st.markdown(f"### 📚 Catatan Tersimpan ({len(st.session_state.catatan_list)})")
+            st.markdown(f"### 📚 Catatan Tersimpan ({len(catatan_list)})")
             
-            for idx, catatan in enumerate(st.session_state.catatan_list):
-                with st.expander(f"{catatan['judul']} - {catatan['tanggal']}"):
-                    col1, col2 = st.columns([3, 1])
+            for catatan in catatan_list:
+                with st.expander(f"{catatan['judul']} - {catatan['tanggal']} (ID: {catatan['id']})"):
+                    col1, col2, col3 = st.columns([3, 1, 1])
                     
                     with col1:
                         st.markdown(f"**Praktikan:** {catatan['praktikan']}")
                         st.markdown(f"**Mata Praktikum:** {catatan['mata_praktikum']}")
+                        st.markdown(f"**Dibuat:** {catatan['waktu_buat']}")
                         if catatan['kelompok']:
                             st.markdown(f"**Kelompok:** {catatan['kelompok']}")
                     
@@ -582,10 +932,18 @@ elif menu == "📝 Catatan Praktikum":
                         st.download_button(
                             label="📥 Download",
                             data=doc_buffer,
-                            file_name=f"catatan_{catatan['judul'].replace(' ', '_')}_{catatan['tanggal']}.docx",
+                            file_name=f"catatan_{catatan['id']}_{catatan['judul'].replace(' ', '_')}.docx",
                             mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                            key=f"download_{idx}"
+                            key=f"download_{catatan['id']}"
                         )
+                    
+                    with col3:
+                        if st.button("🗑️ Hapus", key=f"delete_{catatan['id']}"):
+                            c = conn.cursor()
+                            c.execute("DELETE FROM catatan_praktikum WHERE id = ?", (catatan['id'],))
+                            conn.commit()
+                            st.success("✅ Catatan berhasil dihapus!")
+                            st.rerun()
 
 elif menu == "🧮 Kalkulasi PSA":
     st.markdown('<h2 class="section-header">🧮 Kalkulasi Particle Size Analysis</h2>', unsafe_allow_html=True)
@@ -668,20 +1026,29 @@ elif menu == "🧮 Kalkulasi PSA":
             hasil = kalkulasi_hasil_psa(pdi_list, vol_list, diameter_list)
             
             if hasil:
-                st.session_state.current_psa = {
-                    'hasil': hasil,
-                    'data_input': data_input,
-                    'pdi_list': pdi_list,
-                    'vol_list': vol_list,
-                    'diameter_list': diameter_list
-                }
-                
-                # Simpan ke history
-                st.session_state.psa_data.append({
-                    'waktu': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                    'hasil': hasil,
-                    'data_count': len(data_input)
-                })
+                # Simpan ke database
+                try:
+                    psa_id = save_psa_to_db(conn, hasil, data_input)
+                    st.success(f"✅ Hasil PSA berhasil disimpan ke database! ID: {psa_id}")
+                    
+                    st.session_state.current_psa = {
+                        'id': psa_id,
+                        'hasil': hasil,
+                        'data_input': data_input,
+                        'pdi_list': pdi_list,
+                        'vol_list': vol_list,
+                        'diameter_list': diameter_list
+                    }
+                    
+                except Exception as e:
+                    st.error(f"❌ Gagal menyimpan ke database: {str(e)}")
+                    st.session_state.current_psa = {
+                        'hasil': hasil,
+                        'data_input': data_input,
+                        'pdi_list': pdi_list,
+                        'vol_list': vol_list,
+                        'diameter_list': diameter_list
+                    }
                 
                 st.success("✅ Perhitungan selesai! Buka tab 'Hasil Kalkulasi'.")
                 st.rerun()
@@ -694,6 +1061,10 @@ elif menu == "🧮 Kalkulasi PSA":
             data_input = st.session_state.current_psa['data_input']
             
             st.markdown("### 📊 Hasil Kalkulasi")
+            
+            # Tampilkan ID jika ada
+            if 'id' in st.session_state.current_psa:
+                st.caption(f"ID: {st.session_state.current_psa['id']}")
             
             # Tampilkan hasil utama
             col1, col2, col3 = st.columns(3)
@@ -759,25 +1130,22 @@ elif menu == "🧮 Kalkulasi PSA":
             )
             
             # Tambahkan ke catatan jika ada
-            if st.session_state.catatan_list:
+            catatan_list = get_user_catatan(conn)
+            if catatan_list:
                 st.markdown("---")
                 st.markdown("### 💾 Simpan ke Catatan")
                 
-                catatan_options = {cat['judul']: idx for idx, cat in enumerate(st.session_state.catatan_list)}
+                catatan_options = {f"{cat['judul']} (ID: {cat['id']})": cat['id'] for cat in catatan_list}
                 selected_note = st.selectbox(
                     "Pilih Catatan untuk Menyimpan Hasil PSA:",
                     ["Pilih..."] + list(catatan_options.keys())
                 )
                 
                 if selected_note != "Pilih..." and st.button("💾 Simpan ke Catatan"):
-                    idx = catatan_options[selected_note]
-                    st.session_state.catatan_list[idx]['data_psa'] = {
-                        'diameter_rata': hasil['diameter_rata'],
-                        'pdi_rata': hasil['pdi_rata'],
-                        'kualitas': hasil['kualitas'],
-                        'total_vol': hasil['total_vol']
-                    }
-                    st.success(f"✅ Hasil PSA berhasil disimpan ke catatan '{selected_note}'!")
+                    # Catatan: Untuk menyimpan hubungan antara catatan dan PSA,
+                    # kita bisa membuat tabel relasi atau menyimpan PSA ID di catatan
+                    st.info("Fitur ini dalam pengembangan. Hubungan data akan disimpan di versi berikutnya.")
+                    st.success(f"✅ Hasil PSA akan dihubungkan dengan catatan terpilih.")
 
 elif menu == "📊 Data Tersimpan":
     st.markdown('<h2 class="section-header">📊 Data Tersimpan</h2>', unsafe_allow_html=True)
@@ -785,25 +1153,34 @@ elif menu == "📊 Data Tersimpan":
     tab1, tab2 = st.tabs(["Catatan Praktikum", "Hasil PSA"])
     
     with tab1:
-        if not st.session_state.catatan_list:
+        catatan_list = get_user_catatan(conn)
+        
+        if not catatan_list:
             st.info("📝 Belum ada catatan yang disimpan.")
         else:
-            st.markdown(f"### Total Catatan: {len(st.session_state.catatan_list)}")
+            st.markdown(f"### Total Catatan: {len(catatan_list)}")
             
-            for idx, catatan in enumerate(st.session_state.catatan_list):
-                with st.expander(f"{catatan['judul']} ({catatan['tanggal']})"):
-                    col1, col2 = st.columns([3, 1])
+            # Statistik catatan
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("Catatan Terakhir", catatan_list[0]['judul'][:20] + "..." if len(catatan_list[0]['judul']) > 20 else catatan_list[0]['judul'])
+            with col2:
+                st.metric("Total Catatan", len(catatan_list))
+            with col3:
+                # Hitung catatan bulan ini
+                current_month = datetime.now().strftime("%Y-%m")
+                catatan_bulan_ini = sum(1 for cat in catatan_list if cat['waktu_buat'].startswith(current_month))
+                st.metric("Catatan Bulan Ini", catatan_bulan_ini)
+            
+            for catatan in catatan_list:
+                with st.expander(f"{catatan['judul']} ({catatan['tanggal']}) - ID: {catatan['id']}"):
+                    col1, col2, col3 = st.columns([3, 1, 1])
                     
                     with col1:
                         st.markdown(f"**Praktikan:** {catatan['praktikan']}")
                         st.markdown(f"**Mata Praktikum:** {catatan['mata_praktikum']}")
                         st.markdown(f"**Dibuat:** {catatan['waktu_buat']}")
-                        
-                        if 'data_psa' in catatan:
-                            st.markdown("---")
-                            st.markdown("**Data PSA Terkait:**")
-                            for key, value in catatan['data_psa'].items():
-                                st.markdown(f"- {key}: {value}")
+                        st.markdown(f"**ID Database:** {catatan['id']}")
                     
                     with col2:
                         # Tombol download
@@ -815,41 +1192,280 @@ elif menu == "📊 Data Tersimpan":
                         st.download_button(
                             label="📥 Word",
                             data=doc_buffer,
-                            file_name=f"catatan_{catatan['judul'].replace(' ', '_')}.docx",
+                            file_name=f"catatan_{catatan['id']}_{catatan['judul'].replace(' ', '_')}.docx",
                             mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                            key=f"word_download_{idx}"
+                            key=f"word_download_{catatan['id']}"
                         )
+                    
+                    with col3:
+                        if st.button("🗑️ Hapus", key=f"del_cat_{catatan['id']}"):
+                            c = conn.cursor()
+                            c.execute("DELETE FROM catatan_praktikum WHERE id = ?", (catatan['id'],))
+                            conn.commit()
+                            st.success("✅ Catatan berhasil dihapus!")
+                            st.rerun()
             
-            # Tombol ekspor semua
-            if st.button("📤 Ekspor Semua Data", use_container_width=True):
-                all_data = {
-                    'catatan': st.session_state.catatan_list,
-                    'psa_data': st.session_state.psa_data,
-                    'export_time': datetime.now().isoformat()
+            # Tombol backup semua data
+            st.markdown("---")
+            st.markdown("### 📤 Backup Data")
+            
+            if st.button("💾 Backup Semua Catatan", use_container_width=True):
+                # Buat file JSON backup
+                backup_data = {
+                    'catatan': catatan_list,
+                    'backup_time': datetime.now().isoformat(),
+                    'total_catatan': len(catatan_list)
                 }
                 
+                backup_json = json.dumps(backup_data, indent=2, ensure_ascii=False)
+                
                 st.download_button(
-                    label="📄 Download Word Backup",
-                    data=doc_buffer,
-                    file_name=f"nanote_backup_{datetime.now().strftime('%Y%m%d')}.docx",
-                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                    use_container_width=True,
-                    key="word_backup_download"
+                    label="📥 Download Backup JSON",
+                    data=backup_json,
+                    file_name=f"nanote_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
+                    mime="application/json",
+                    use_container_width=True
                 )
     
     with tab2:
-        if not st.session_state.psa_data:
+        psa_list = get_user_psa_history(conn)
+        
+        if not psa_list:
             st.info("🧮 Belum ada hasil PSA yang disimpan.")
         else:
-            st.markdown(f"### Total Hasil PSA: {len(st.session_state.psa_data)}")
+            st.markdown(f"### Total Hasil PSA: {len(psa_list)}")
             
-            for idx, psa in enumerate(st.session_state.psa_data):
-                with st.expander(f"Perhitungan {idx+1} - {psa['waktu']}"):
-                    st.markdown(f"**Waktu:** {psa['waktu']}")
-                    st.markdown(f"**Jumlah Data:** {psa['data_count']}")
-                    st.markdown(f"**Diameter Rata-rata:** {psa['hasil']['diameter_rata']:.2f} nm")
-                    st.markdown(f"**PDI Rata-rata:** {psa['hasil']['pdi_rata']:.3f}")
-                    st.markdown(f"**Kualitas:** {psa['hasil']['kualitas']}")
+            # Statistik PSA
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                avg_diameter = np.mean([psa['diameter_rata'] for psa in psa_list])
+                st.metric("Rata-rata Diameter", f"{avg_diameter:.2f} nm")
+            with col2:
+                avg_pdi = np.mean([psa['pdi_rata'] for psa in psa_list])
+                st.metric("Rata-rata PDI", f"{avg_pdi:.3f}")
+            with col3:
+                total_partikel = sum([psa['jumlah_partikel'] for psa in psa_list])
+                st.metric("Total Partikel", total_partikel)
+            
+            for psa in psa_list:
+                with st.expander(f"PSA {psa['id']} - {psa['created_at']}"):
+                    col1, col2, col3 = st.columns([3, 1, 1])
+                    
+                    with col1:
+                        st.markdown(f"**Waktu:** {psa['created_at']}")
+                        st.markdown(f"**Diameter Rata-rata:** {psa['diameter_rata']:.2f} nm")
+                        st.markdown(f"**PDI Rata-rata:** {psa['pdi_rata']:.3f}")
+                        st.markdown(f"**Kualitas:** {psa['kualitas']}")
+                        st.markdown(f"**Jumlah Partikel:** {psa['jumlah_partikel']}")
+                        st.markdown(f"**ID Database:** {psa['id']}")
+                    
+                    with col2:
+                        # Tombol lihat detail
+                        if st.button("👁️ Detail", key=f"view_psa_{psa['id']}"):
+                            st.session_state.current_psa = {
+                                'id': psa['id'],
+                                'hasil': psa,
+                                'data_input': psa['data_input']
+                            }
+                            st.rerun()
+                    
+                    with col3:
+                        if st.button("🗑️ Hapus", key=f"del_psa_{psa['id']}"):
+                            c = conn.cursor()
+                            c.execute("DELETE FROM hasil_psa WHERE id = ?", (psa['id'],))
+                            conn.commit()
+                            st.success("✅ Data PSA berhasil dihapus!")
+                            st.rerun()
+
+elif menu == "📈 Riwayat & Statistik":
+    st.markdown('<h2 class="section-header">📈 Riwayat & Statistik Penggunaan</h2>', unsafe_allow_html=True)
+    
+    tab1, tab2, tab3 = st.tabs(["Statistik", "Riwayat Aktivitas", "Manajemen Data"])
+    
+    with tab1:
+        st.markdown("### 📊 Statistik Penggunaan Anda")
+        
+        user_stats = get_user_stats(conn)
+        recent_activities = get_recent_activities(conn, 5)
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("#### Aktivitas Utama")
+            st.metric("Total Catatan Dibuat", user_stats['catatan_created'])
+            st.metric("Total PSA Dihitung", user_stats['psa_calculated'])
+            st.metric("Total Halaman Dilihat", user_stats['page_views'])
+        
+        with col2:
+            st.markdown("#### Informasi Akun")
+            st.markdown(f"**User ID:** `{get_user_id()}`")
+            st.markdown(f"**Akun Dibuat:** `{user_stats['created_at'] or 'Tidak diketahui'}`")
+            st.markdown(f"**Terakhir Aktif:** `{user_stats['last_active'] or 'Belum aktif'}`")
+        
+        st.markdown("---")
+        
+        # Visualisasi statistik
+        st.markdown("#### 📈 Grafik Aktivitas")
+        
+        # Ambil lebih banyak data untuk grafik
+        all_activities = get_recent_activities(conn, 50)
+        
+        if all_activities:
+            # Hitung aktivitas per hari
+            from collections import defaultdict
+            import datetime as dt
+            
+            daily_activity = defaultdict(int)
+            for activity in all_activities:
+                date = activity['timestamp'][:10]  # Ambil hanya tanggal
+                daily_activity[date] += 1
+            
+            # Buat DataFrame untuk plotting
+            dates = list(daily_activity.keys())[-10:]  # 10 hari terakhir
+            counts = [daily_activity[date] for date in dates]
+            
+            fig, ax = plt.subplots(figsize=(10, 4))
+            ax.bar(dates, counts, color='#3B82F6')
+            ax.set_xlabel('Tanggal')
+            ax.set_ylabel('Jumlah Aktivitas')
+            ax.set_title('Aktivitas 10 Hari Terakhir')
+            plt.xticks(rotation=45)
+            plt.tight_layout()
+            st.pyplot(fig)
+        
+        # Ringkasan aktivitas terkini
+        st.markdown("#### 🕒 Aktivitas Terkini")
+        if recent_activities:
+            for activity in recent_activities:
+                timestamp = activity['timestamp']
+                activity_type = activity['type']
+                
+                if activity_type == 'catatan_created':
+                    emoji = "📝"
+                    desc = f"Membuat catatan: {activity['data'].get('judul', 'Tanpa judul')}"
+                elif activity_type == 'psa_calculated':
+                    emoji = "🧮"
+                    desc = f"Menghitung PSA: Diameter {activity['data'].get('diameter_rata', 0):.2f} nm"
+                elif activity_type == 'page_view':
+                    emoji = "👁️"
+                    desc = f"Melihat halaman: {activity['data'].get('page', 'Unknown')}"
+                else:
+                    emoji = "📌"
+                    desc = activity_type
+                
+                st.markdown(f"{emoji} **{timestamp}** - {desc}")
+        else:
+            st.info("Belum ada aktivitas yang tercatat.")
+    
+    with tab2:
+        st.markdown("### 📋 Riwayat Aktivitas Lengkap")
+        
+        # Filter aktivitas
+        col1, col2 = st.columns(2)
+        with col1:
+            limit = st.slider("Jumlah aktivitas yang ditampilkan:", 5, 100, 20)
+        
+        with col2:
+            filter_type = st.selectbox(
+                "Filter jenis aktivitas:",
+                ["Semua", "catatan_created", "psa_calculated", "page_view"]
+            )
+        
+        # Ambil data dengan filter
+        all_activities = get_recent_activities(conn, 1000)  # Ambil banyak data
+        
+        if filter_type != "Semua":
+            all_activities = [a for a in all_activities if a['type'] == filter_type]
+        
+        # Tampilkan tabel
+        if all_activities:
+            activities_display = []
+            for activity in all_activities[:limit]:
+                activities_display.append({
+                    'Waktu': activity['timestamp'],
+                    'Jenis': activity['type'],
+                    'Data': str(activity['data'])[:100] + "..." if len(str(activity['data'])) > 100 else str(activity['data'])
+                })
+            
+            df_activities = pd.DataFrame(activities_display)
+            st.dataframe(df_activities, use_container_width=True)
+            
+            # Tombol ekspor riwayat
+            csv = df_activities.to_csv(index=False).encode('utf-8')
+            st.download_button(
+                label="📥 Download Riwayat (CSV)",
+                data=csv,
+                file_name=f"riwayat_aktivitas_{datetime.now().strftime('%Y%m%d')}.csv",
+                mime="text/csv",
+                use_container_width=True
+            )
+        else:
+            st.info("Tidak ada aktivitas yang sesuai dengan filter.")
+    
+    with tab3:
+        st.markdown("### 🗄️ Manajemen Data")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("#### Ekspor Database")
+            st.markdown("""
+            Ekspor seluruh data Anda dalam format JSON.
+            File ini berisi:
+            - Semua catatan praktikum
+            - Semua hasil PSA
+            - Riwayat aktivitas
+            - Statistik penggunaan
+            """)
+            
+            if st.button("📤 Ekspor Semua Data", use_container_width=True):
+                # Kumpulkan semua data
+                all_data = {
+                    'user_id': get_user_id(),
+                    'catatan': get_user_catatan(conn),
+                    'psa_history': get_user_psa_history(conn),
+                    'user_stats': get_user_stats(conn),
+                    'recent_activities': get_recent_activities(conn, 1000),
+                    'export_time': datetime.now().isoformat(),
+                    'app_version': 'NaNote v1.0'
+                }
+                
+                json_data = json.dumps(all_data, indent=2, ensure_ascii=False, default=str)
+                
+                st.download_button(
+                    label="💾 Download Backup Lengkap",
+                    data=json_data,
+                    file_name=f"nanote_full_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
+                    mime="application/json",
+                    use_container_width=True
+                )
+        
+        with col2:
+            st.markdown("#### Reset Data")
+            st.markdown("""
+            ⚠️ **PERHATIAN:** Tindakan ini akan menghapus semua data Anda!
+            
+            Yang akan dihapus:
+            - Semua catatan praktikum
+            - Semua hasil PSA
+            - Riwayat aktivitas
+            - Statistik penggunaan
+            
+            Tindakan ini tidak dapat dibatalkan!
+            """)
+            
+            if st.checkbox("Saya mengerti dan ingin menghapus semua data"):
+                if st.button("🗑️ HAPUS SEMUA DATA", type="secondary", use_container_width=True):
+                    c = conn.cursor()
+                    c.execute("DELETE FROM catatan_praktikum WHERE user_id = ?", (get_user_id(),))
+                    c.execute("DELETE FROM hasil_psa WHERE user_id = ?", (get_user_id(),))
+                    c.execute("DELETE FROM user_history WHERE user_id = ?", (get_user_id(),))
+                    c.execute("DELETE FROM usage_stats WHERE user_id = ?", (get_user_id(),))
+                    conn.commit()
+                    
+                    st.success("✅ Semua data berhasil dihapus!")
+                    st.info("Halaman akan direfresh...")
+                    st.rerun()
 
 else:  # Panduan
     st.markdown('<h2 class="section-header">ℹ️ Panduan Penggunaan</h2>', unsafe_allow_html=True)
@@ -861,25 +1477,42 @@ else:  # Panduan
     1. **Mencatat hasil praktikum** nanomaterial secara digital
     2. **Menganalisis data PSA** (Particle Size Analysis)
     3. **Menyimpan dan mengekspor** hasil dalam format standar
+    4. **Menyimpan riwayat** menggunakan database SQLite
+    
+    ### 🗄️ Sistem Database
+    
+    Aplikasi ini menggunakan **SQLite** untuk menyimpan data secara lokal. Database menyimpan:
+    - **Catatan praktikum** lengkap dengan metadata
+    - **Hasil perhitungan PSA** beserta data input
+    - **Riwayat aktivitas** pengguna
+    - **Statistik penggunaan** aplikasi
     
     ### 🔎 Cara Menggunakan
     
     #### 1. Catatan Praktikum
     - Buka menu **"📝 Catatan Praktikum"**
     - Isi form dengan data lengkap praktikum
-    - Simpan catatan dan download sebagai file Word (.docx)
+    - Data otomatis tersimpan di database
+    - Download sebagai file Word (.docx)
     
     #### 2. Kalkulator PSA
     - Buka menu **"🧮 Kalkulator PSA"**
     - Input data PDI, %vol, dan diameter untuk setiap partikel
     - Klik "Hitung Hasil PSA"
-    - Lihat hasil di tab "Hasil Perhitungan"
+    - Hasil otomatis tersimpan di database
     - Download hasil sebagai PDF
     
     #### 3. Data Tersimpan
     - Buka menu **"📊 Data Tersimpan"**
-    - Lihat semua catatan dan hasil perhitungan yang telah disimpan
-    - Ekspor data backup jika diperlukan
+    - Lihat semua catatan dan hasil perhitungan dari database
+    - Hapus data yang tidak diperlukan
+    - Backup data ke file JSON
+    
+    #### 4. Riwayat & Statistik
+    - Buka menu **"📈 Riwayat & Statistik"**
+    - Lihat statistik penggunaan aplikasi
+    - Pantau riwayat aktivitas
+    - Ekspor atau reset data
     
     ### 📊 Interpretasi Hasil PSA
     
@@ -896,17 +1529,24 @@ else:  # Panduan
     - 100-500 nm: Besar
     - > 500 nm: Sangat besar
     
-    ### 💡 Tips
-    1. Simpan catatan segera setelah praktikum selesai
-    2. Periksa konsistensi data sebelum menghitung PSA
-    3. Gunakan ekspor PDF untuk laporan formal
-    4. Backup data penting secara berkala
+    ### 💡 Tips Penggunaan Database
+    1. **Backup reguler**: Ekspor data Anda secara berkala
+    2. **ID Database**: Setiap data memiliki ID unik untuk referensi
+    3. **Statistik**: Pantau penggunaan Anda di menu Riwayat
+    4. **Pembersihan**: Hapus data lama yang tidak diperlukan
     
     ### 🛠️ Teknologi
     - **Framework**: Streamlit (Python)
-    - **Format Ekspor**: .docx, .pdf
+    - **Database**: SQLite
+    - **Format Ekspor**: .docx, .pdf, .json, .csv
     - **Deployment**: Streamlit Cloud
     - **Bahasa**: Indonesia
+    
+    ### 🔒 Keamanan Data
+    - Data disimpan lokal dalam file `nanote.db`
+    - Setiap pengguna memiliki ID unik
+    - Backup data dalam format JSON aman
+    - Opsi reset data tersedia
     
     ### 🤝 Kontribusi
     Aplikasi ini bersifat open source. Untuk saran dan masukan, silakan buat issue di repository GitHub.
@@ -918,3 +1558,6 @@ st.markdown('<div class="footer">', unsafe_allow_html=True)
 st.markdown("🔬 **NaNote** • Aplikasi Catatan Praktikum & Kalkulasi PSA • Dibuat oleh Kelompok 3 Logika dan Pemrograman Komputer")
 st.markdown(f"© {datetime.now().year}")
 st.markdown('</div>', unsafe_allow_html=True)
+
+# Tutup koneksi database saat aplikasi selesai
+conn.close()
