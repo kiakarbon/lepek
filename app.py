@@ -110,6 +110,15 @@ DB_FILE = "users_db.json"
 
 def init_database():
     """Inisialisasi database JSON"""
+    if not os.path.exists(DB_FILE):
+        # Buat file database tanpa user default
+        default_users = {}
+        with open(DB_FILE, 'w') as f:
+            json.dump(default_users, f, indent=2)
+        return default_users
+    else:
+        with open(DB_FILE, 'r') as f:
+            return json.load(f)
 
 def save_database(db):
     """Simpan database ke file"""
@@ -124,8 +133,9 @@ def register_user(username, password, full_name=""):
     """Registrasi pengguna baru"""
     db = init_database()
     
-    if username in db:
-        return False, "Username sudah digunakan"
+    # Validasi input
+    if not username or not password:
+        return False, "Username dan password harus diisi"
     
     if len(username) < 3:
         return False, "Username minimal 3 karakter"
@@ -133,10 +143,15 @@ def register_user(username, password, full_name=""):
     if len(password) < 6:
         return False, "Password minimal 6 karakter"
     
+    if username in db:
+        return False, "Username sudah digunakan"
+    
     db[username] = {
         "password": hash_password(password),
         "name": full_name if full_name else username,
-        "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "last_login": None,
+        "login_count": 0
     }
     
     save_database(db)
@@ -151,6 +166,11 @@ def login_user(username, password):
     
     if db[username]["password"] != hash_password(password):
         return False, "Password salah"
+    
+    # Update last login
+    db[username]["last_login"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    db[username]["login_count"] = db[username].get("login_count", 0) + 1
+    save_database(db)
     
     return True, db[username]
 
@@ -345,11 +365,11 @@ def buat_grafik_distribusi(distribusi):
     return fig
 
 # ============================================
-# HALAMAN LOGIN
+# HALAMAN LOGIN (TANPA INFO DEMO)
 # ============================================
 
 def show_login_page():
-    """Tampilkan halaman login"""
+    """Tampilkan halaman login tanpa info akun demo"""
     
     col1, col2, col3 = st.columns([1, 2, 1])
     
@@ -358,10 +378,10 @@ def show_login_page():
         
         # Logo dan judul
         st.markdown('<h1 style="text-align: center; color: #1E3A8A;">🔬 NaNote</h1>', unsafe_allow_html=True)
-        st.markdown('<p style="text-align: center; color: #4B5563;">Login untuk mulai menggunakan aplikasi</p>', unsafe_allow_html=True)
+        st.markdown('<p style="text-align: center; color: #4B5563;">Catatan Praktikum & Kalkulator PSA</p>', unsafe_allow_html=True)
         
         # Tab untuk login dan register
-        tab1, tab2 = st.tabs(["Login", "Register"])
+        tab1, tab2 = st.tabs(["Login", "Daftar Akun Baru"])
         
         with tab1:
             st.markdown("### Masuk ke Akun")
@@ -390,7 +410,7 @@ def show_login_page():
             new_user = st.text_input("Username Baru", placeholder="Pilih username")
             new_pass = st.text_input("Password Baru", type="password", placeholder="Pilih password")
             confirm_pass = st.text_input("Konfirmasi Password", type="password", placeholder="Ulangi password")
-            full_name = st.text_input("Nama Lengkap (opsional)", placeholder="Nama Anda")
+            full_name = st.text_input("Nama Lengkap (opsional)", placeholder="Nama lengkap Anda")
             
             if st.button("Daftar", key="register_button", use_container_width=True):
                 if not new_user or not new_pass:
@@ -405,6 +425,7 @@ def show_login_page():
                     success, message = register_user(new_user, new_pass, full_name)
                     if success:
                         st.success(message)
+                        st.info("Silakan login dengan akun yang baru dibuat")
                     else:
                         st.error(message)
         
@@ -414,7 +435,7 @@ def show_login_page():
     st.markdown("---")
     st.markdown('<div class="footer">', unsafe_allow_html=True)
     st.markdown("🔬 **NaNote** • Aplikasi Catatan Praktikum & Kalkulasi PSA")
-    st.markdown(f"© {datetime.now().year} • Kelompok 3 Logika dan Pemrograman Komputer")
+    st.markdown(f"© {datetime.now().year} • Versi 2.0")
     st.markdown('</div>', unsafe_allow_html=True)
 
 # ============================================
@@ -1025,7 +1046,7 @@ def main_app():
         ### 🔒 Sistem Login
         - Akun disimpan di database lokal (JSON)
         - Data pengguna terpisah per akun
-        - Akun demo tersedia untuk testing
+        - Password di-hash untuk keamanan
         
         ### 💡 Tips
         1. Simpan catatan segera setelah praktikum selesai
