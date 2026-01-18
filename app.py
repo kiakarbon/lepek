@@ -1044,8 +1044,8 @@ def main_app():
         - > 500 nm: Sangat besar
         
         ### 🔒 Sistem Login
-        - Akun disimpan di database lokal (JSON)
-        - Data pengguna terpisah per akun
+        - Akun disimpan di database lokal
+        - Data pengguna terpisah per-akun
         - Password di-hash untuk keamanan
         
         ### 💡 Tips
@@ -1053,13 +1053,6 @@ def main_app():
         2. Periksa konsistensi data sebelum menghitung PSA
         3. Gunakan ekspor PDF untuk laporan formal
         4. Backup data penting secara berkala
-        
-        ### 🛠️ Teknologi
-        - **Framework**: Streamlit (Python)
-        - **Format Ekspor**: .docx, .pdf
-        - **Database**: JSON lokal
-        - **Deployment**: Streamlit Cloud
-        - **Bahasa**: Indonesia
         
         ### 🤝 Kontribusi
         Aplikasi ini bersifat open source. Untuk saran dan masukan, silakan buat issue di repository GitHub.
