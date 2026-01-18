@@ -5,3 +5,4 @@ python-docx>=0.8.11
 reportlab>=4.0.0
 matplotlib>=3.7.0
 openpyxl>=3.1.0
+pip install streamlit pandas numpy python-docx reportlab matplotlib email-validator
