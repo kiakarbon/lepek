@@ -849,6 +849,6 @@ else:  # Panduan
 # Footer
 st.markdown("---")
 st.markdown('<div class="footer">', unsafe_allow_html=True)
-st.markdown("🔬 **NaNote v1.0** • Aplikasi Catatan Praktikum & Kalkulasi PSA • Dibuat oleh Kelompok 3 Logika dan Pemrograman Komputer")
+st.markdown("🔬 **NaNote** • Aplikasi Catatan Praktikum & Kalkulasi PSA • Dibuat oleh Kelompok 3 Logika dan Pemrograman Komputer")
 st.markdown(f"© {datetime.now().year}")
 st.markdown('</div>', unsafe_allow_html=True)
