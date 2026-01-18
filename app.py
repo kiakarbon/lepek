@@ -9,6 +9,72 @@ from reportlab.pdfgen import canvas
 from reportlab.lib import colors
 from reportlab.platypus import Table, TableStyle
 import matplotlib.pyplot as plt
+import sqlite3
+import json
+
+def init_db():
+    conn = sqlite3.connect('nanote.db')
+    c = conn.cursor()
+    # Tabel catatan
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS catatan (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            judul TEXT,
+            praktikan TEXT,
+            mata_praktikum TEXT,
+            tanggal TEXT,
+            kelompok TEXT,
+            pic TEXT,
+            isi TEXT,  -- JSON string
+            waktu_buat TEXT
+        )
+    ''')
+    # Tabel PSA
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS psa (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            waktu TEXT,
+            data_input TEXT,  -- JSON string
+            hasil TEXT,  -- JSON string
+            data_count INTEGER
+        )
+    ''')
+    conn.commit()
+    conn.close()
+
+def simpan_catatan_db(catatan_data):
+    conn = sqlite3.connect('nanote.db')
+    c = conn.cursor()
+    isi_json = json.dumps(catatan_data['isi'])
+    c.execute('''
+        INSERT INTO catatan (judul, praktikan, mata_praktikum, tanggal, kelompok, pic, isi, waktu_buat)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    ''', (catatan_data['judul'], catatan_data['praktikan'], catatan_data['mata_praktikum'],
+          catatan_data['tanggal'], catatan_data['kelompok'], catatan_data['pic'],
+          isi_json, catatan_data['waktu_buat']))
+    conn.commit()
+    conn.close()
+
+def ambil_catatan_db():
+    conn = sqlite3.connect('nanote.db')
+    c = conn.cursor()
+    c.execute('SELECT * FROM catatan')
+    rows = c.fetchall()
+    catatan_list = []
+    for row in rows:
+        catatan_list.append({
+            'id': row[0],
+            'judul': row[1],
+            'praktikan': row[2],
+            'mata_praktikum': row[3],
+            'tanggal': row[4],
+            'kelompok': row[5],
+            'pic': row[6],
+            'isi': json.loads(row[7]),
+            'waktu_buat': row[8]
+        })
+    conn.close()
+    return catatan_list
 
 # Konfigurasi halaman
 st.set_page_config(
